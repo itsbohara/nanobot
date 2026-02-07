@@ -31,17 +31,17 @@ class LiteLLMProvider(LLMProvider):
             (api_key and api_key.startswith("sk-or-")) or
             (api_base and "openrouter" in api_base)
         )
-        
-        # Track if using custom endpoint (vLLM, etc.)
-        self.is_vllm = bool(api_base) and not self.is_openrouter
-        
+
+        # Track if using custom endpoint (vLLM, zero, etc.)
+        self.is_custom_endpoint = bool(api_base) and not self.is_openrouter
+
         # Configure LiteLLM based on provider
         if api_key:
             if self.is_openrouter:
                 # OpenRouter mode - set key
                 os.environ["OPENROUTER_API_KEY"] = api_key
-            elif self.is_vllm:
-                # vLLM/custom endpoint - uses OpenAI-compatible API
+            elif self.is_custom_endpoint:
+                # Custom endpoint (vLLM, zero, etc.) - uses OpenAI-compatible API
                 os.environ["HOSTED_VLLM_API_KEY"] = api_key
             elif "deepseek" in default_model:
                 os.environ.setdefault("DEEPSEEK_API_KEY", api_key)
@@ -96,12 +96,12 @@ class LiteLLMProvider(LLMProvider):
         
         # For Zhipu/Z.ai, ensure prefix is present
         # Handle cases like "glm-4.7-flash" -> "zai/glm-4.7-flash"
-        if ("glm" in model.lower() or "zhipu" in model.lower()) and not (
-            model.startswith("zhipu/") or 
-            model.startswith("zai/") or 
-            model.startswith("openrouter/")
-        ):
-            model = f"zai/{model}"
+        # if ("glm" in model.lower() or "zhipu" in model.lower()) and not (
+        #     model.startswith("zhipu/") or
+        #     model.startswith("zai/") or
+        #     model.startswith("openrouter/")
+        # ):
+        #     model = f"zai/{model}"
 
         # For DashScope/Qwen, ensure dashscope/ prefix
         if ("qwen" in model.lower() or "dashscope" in model.lower()) and not (
@@ -120,12 +120,12 @@ class LiteLLMProvider(LLMProvider):
         if "gemini" in model.lower() and not model.startswith("gemini/"):
             model = f"gemini/{model}"
 
+        # For custom endpoints (vLLM, zero, etc.), use hosted_vllm/ prefix
+        # The full model name is sent to the endpoint (prefixes are preserved)
+        if self.is_custom_endpoint:
+            if not model.startswith("hosted_vllm/"):
+                model = f"hosted_vllm/{model}"
 
-        # For vLLM, use hosted_vllm/ prefix per LiteLLM docs
-        # Convert openai/ prefix to hosted_vllm/ if user specified it
-        if self.is_vllm:
-            model = f"hosted_vllm/{model}"
-        
         # kimi-k2.5 only supports temperature=1.0
         if "kimi-k2.5" in model.lower():
             temperature = 1.0

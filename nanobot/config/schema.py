@@ -79,6 +79,7 @@ class ProvidersConfig(BaseModel):
     vllm: ProviderConfig = Field(default_factory=ProviderConfig)
     gemini: ProviderConfig = Field(default_factory=ProviderConfig)
     moonshot: ProviderConfig = Field(default_factory=ProviderConfig)
+    zero: ProviderConfig = Field(default_factory=ProviderConfig)
 
 
 class GatewayConfig(BaseModel):
@@ -144,6 +145,7 @@ class Config(BaseSettings):
             "moonshot": self.providers.moonshot,
             "kimi": self.providers.moonshot,
             "vllm": self.providers.vllm,
+            "zero": self.providers.zero,
         }
         for keyword, provider in providers.items():
             if keyword in model and provider.api_key:
@@ -158,11 +160,17 @@ class Config(BaseSettings):
             return matched.api_key
         # Fallback: return first available key
         for provider in [
-            self.providers.openrouter, self.providers.deepseek,
-            self.providers.anthropic, self.providers.openai,
-            self.providers.gemini, self.providers.zhipu,
-            self.providers.dashscope, self.providers.moonshot,
-            self.providers.vllm, self.providers.groq,
+            self.providers.openrouter,
+            self.providers.deepseek,
+            self.providers.anthropic,
+            self.providers.openai,
+            self.providers.gemini,
+            self.providers.zhipu,
+            self.providers.dashscope,
+            self.providers.moonshot,
+            self.providers.vllm,
+            self.providers.groq,
+            self.providers.zero,
         ]:
             if provider.api_key:
                 return provider.api_key
@@ -175,7 +183,14 @@ class Config(BaseSettings):
             return self.providers.openrouter.api_base or "https://openrouter.ai/api/v1"
         if any(k in model for k in ("zhipu", "glm", "zai")):
             return self.providers.zhipu.api_base
-        if "vllm" in model:
+        if "vllm" in model and self.providers.vllm.api_base:
+            return self.providers.vllm.api_base
+        if "zero" in model and self.providers.zero.api_base:
+            return self.providers.zero.api_base
+        # Fallback: if any custom endpoint has api_base configured, use it
+        if self.providers.zero.api_base:
+            return self.providers.zero.api_base
+        if self.providers.vllm.api_base:
             return self.providers.vllm.api_base
         return None
     
